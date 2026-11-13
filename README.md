@@ -20,12 +20,6 @@ Then open http://localhost:8080
 
 ## Debug
 
-Build with debug symbols and warnings:
-
-```bash
-g++ -g -Wall -o obj http_server.cpp
-```
-
 Run under gdb:
 
 ```bash
