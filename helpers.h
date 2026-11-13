@@ -6,6 +6,8 @@
 #include<iostream>
 #include<unistd.h>
 #include <arpa/inet.h>
+#include <climits>
+#include <cstdlib>
 
 
 char* root=nullptr; //i think keeping this as global is reasonable
@@ -114,7 +116,17 @@ std::fstream* openFile(char* FilePath,bool openRoot=false)
     
     std::fstream* file=new std::fstream;
     if(areEqual("",FilePath)) file->open(root);
-   else file->open(rootDir + "/" + FilePath);
+    else
+    {
+        char realRoot[PATH_MAX], realReq[PATH_MAX];
+        std::string full = rootDir + "/" + FilePath;
+        if (!realpath(rootDir.c_str(), realRoot) || !realpath(full.c_str(), realReq))
+            { delete file; return nullptr; }
+        std::string r = realRoot, q = realReq;
+        if (q.compare(0, r.size() + 1, r + "/") != 0)
+            { delete file; return nullptr; }
+        file->open(q);
+    }
     if(!(file->is_open()))
      {
         std::cerr<<"Error opening File\nPath given to function: "
