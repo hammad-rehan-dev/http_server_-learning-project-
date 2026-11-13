@@ -122,8 +122,9 @@ std::fstream* openFile(char* FilePath,bool openRoot=false)
                 <<"\nPath after building with rootDIR: "
                 <<rootDir+"/"+FilePath<<std::endl;
                 
+                return nullptr;
                 
-                exit(-3);
+            
                 
     }
     else return file;

@@ -16,6 +16,7 @@ int main(int argc,char* argv[])
         cerr<<"No file Path given\n";
         exit(-1);
     }
+ 
     root=argv[1];
     rootDir=root;
     rootDir = rootDir.substr(0, rootDir.find_last_of('/')); // "Compiler2.0/web/index.html" -> "Compiler2.0/web"
@@ -24,6 +25,7 @@ int main(int argc,char* argv[])
 
     const int connectionLimit=25;
     const int bufferSize=1024;
+
     char buffer[bufferSize];
     
     int status=0;
@@ -51,7 +53,7 @@ int main(int argc,char* argv[])
     status=getaddrinfo(NULL,"8080",&hints,&results);
     cursor=results;
 
-    while(cursor->ai_family != AF_INET6 && cursor !=nullptr )
+    while(cursor !=nullptr && cursor->ai_family != AF_INET6  )
     {
         cursor=cursor->ai_next;
     }
@@ -85,7 +87,7 @@ int main(int argc,char* argv[])
     sockaddr_in6 * Myaddress=(sockaddr_in6*)(cursor->ai_addr);
     char str[INET6_ADDRSTRLEN]; 
 
-    if (inet_ntop(AF_INET6, &Myaddress, str, sizeof(str))) {
+    if (inet_ntop(AF_INET6, &Myaddress->sin6_addr, str, sizeof(str))) {
         std::cout << "IPv6 Address: " << str << std::endl;
     } else {
         std::cerr << "Error converting IP address" << std::endl;
@@ -143,8 +145,8 @@ int main(int argc,char* argv[])
         
         cout<<"Browser Responded with : "<<Response;
 
-        if(!once && !FilePath) delete FilePath;
-        if(!once && !ext) delete ext;
+        if(!once && !FilePath) delete[] FilePath;
+        if(!once && !ext) delete[] ext;
 
         if(!parseHTTP(Response.c_str(),FilePath)){cerr<<"PARSE HTTP FAILED\n"; exit(-7);}
         else
@@ -161,8 +163,16 @@ int main(int argc,char* argv[])
                 }
             }
         }
+
+
+        if (html != nullptr)
+        {
+            html->close();
+            delete html;
+            html = nullptr;
+        }
         
-        html->close();
+
         cout<<"file: "<<FilePath<<endl;
         html=openFile(FilePath);
         cout<<"\nFile opened\n";
@@ -176,18 +186,44 @@ int main(int argc,char* argv[])
         
         headerSent=false;
         if(!returnFileExtension(FilePath,ext)){cerr<<"RETURN FILE EXTENSION FAILED\n"; /*exit(-8);*/}
-        html->clear();
-        html->seekg(0, ios::end);
-        long fileSize = html->tellg();
-        html->seekg(0, ios::beg);
+        long fileSize;
 
+        if(html!=nullptr){
+            html->clear();
+            html->seekg(0, ios::end);
+            fileSize = html->tellg();
+            html->seekg(0, ios::beg);
+        }
 
 
         //====================================
         // build and send the header
         //====================================
 
-        if(ext!=nullptr)
+        if(html == nullptr)
+        {
+            string body =
+                "<!DOCTYPE html>"
+                "<html>"
+                "<head><title>404 Not Found</title></head>"
+                "<body><h1>File Not Found</h1></body>"
+                "</html>";
+
+            string header =
+                "HTTP/1.1 404 Not Found\r\n"
+                "Content-Type: text/html; charset=UTF-8\r\n"
+                "Content-Length: " + to_string(body.size()) + "\r\n"
+                "Connection: close\r\n"
+                "\r\n";
+
+            send(clientfd, header.c_str(), header.size(), 0);
+            send(clientfd, body.c_str(), body.size(), 0);
+
+            headerSent = true;
+        }
+
+
+        if(ext!=nullptr && !headerSent)
         {
             string fileExtension=ext;
 
@@ -208,7 +244,11 @@ int main(int argc,char* argv[])
 
             cout<<"HEADER SENT TO CLIENT: "<<header<<endl;
             headerSent=true;
-        }
+        } 
+         
+
+
+
         //======================================
         //  SEND DATA
         //======================================
@@ -216,6 +256,7 @@ int main(int argc,char* argv[])
         if(headerSent){
             while(true)
             {
+                if(html==nullptr) break;
                 html->read(buffer, bufferSize);
                 std::streamsize bytesRead = html->gcount();
                 if(bytesRead <= 0) break;
